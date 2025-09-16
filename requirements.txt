@@ -1,0 +1,17 @@
+# PyTorch and computer vision
+torch
+torchvision
+
+# Data handling and utilities
+numpy
+pandas
+matplotlib
+scikit-learn
+Pillow
+tqdm
+
+# For downloading data
+kaggle
+
+# For notebooks
+jupyterlab
