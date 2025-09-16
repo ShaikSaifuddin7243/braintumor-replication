@@ -1,3 +1,4 @@
+# FILE: config.yaml
 # Data settings
 DATA_DIR: "data/clean"
 IMAGE_SIZE: 227
