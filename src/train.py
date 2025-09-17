@@ -1,8 +1,21 @@
 # FILE: src/train.py
-import yaml, torch, torch.nn as nn, os
+import yaml
+import torch
+import torch.nn as nn
+import os
+import argparse
 from tqdm import tqdm
+
+# Use explicit relative imports
 from .dataloader import get_dataloaders
-from .model import CNN_C1
+from .model import CNN_C1, CNN_C2
+
+# --- Model Registry ---
+# This allows us to select the model dynamically based on the config file.
+models = {
+    "CNN_C1": CNN_C1,
+    "CNN_C2": CNN_C2
+}
 
 def train_one_epoch(model, dataloader, criterion, optimizer, device):
     model.train()
@@ -34,27 +47,59 @@ def evaluate(model, dataloader, criterion, device):
             total_samples += labels.size(0)
     return running_loss / total_samples, (correct_predictions.double() / total_samples).item()
 
-def main():
-    with open('config.yaml', 'r') as f: config = yaml.safe_load(f)
-    device = torch.device(config['DEVICE'] if torch.cuda.is_available() else "cpu")
+def main(args):
+    # --- 1. Load Configuration ---
+    with open('config.yaml', 'r') as f:
+        full_config = yaml.safe_load(f)
+    
+    # Select the configuration for the specified model
+    config = full_config[args.model_config]
+    global_config = {k: v for k, v in full_config.items() if not isinstance(v, dict)}
+
+    # --- 2. Setup Device, Model, Loss, Optimizer ---
+    device = torch.device(global_config['DEVICE'] if torch.cuda.is_available() else "cpu")
+    print(f"--- Experiment: {config['MODEL_NAME']} ---")
     print(f"Using device: {device}")
-    model = CNN_C1(num_classes=config['NUM_CLASSES']).to(device)
+
+    # Dynamically select the model class from the registry
+    ModelClass = models[config['MODEL_NAME']]
+    model = ModelClass(num_classes=config['NUM_CLASSES']).to(device)
+    
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=config['LEARNING_RATE'])
-    train_loader, val_loader, _ = get_dataloaders(data_dir=config['DATA_DIR'], image_size=config['IMAGE_SIZE'], batch_size=config['BATCH_SIZE'])
+    
+    # --- 3. Load Data ---
+    train_loader, val_loader, _ = get_dataloaders(
+        config=config,
+        global_config=global_config
+    )
+    
+    # --- 4. Training Loop ---
     best_val_acc = 0.0
-    os.makedirs("results", exist_ok=True)
+    results_dir = "results"
+    os.makedirs(results_dir, exist_ok=True) 
+
     for epoch in range(config['EPOCHS']):
         print(f"\n--- Epoch {epoch+1}/{config['EPOCHS']} ---")
         train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
         print(f"Epoch {epoch+1} | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f}")
+        
         val_loss, val_acc = evaluate(model, val_loader, criterion, device)
         print(f"Epoch {epoch+1} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
+
         if val_acc > best_val_acc:
             best_val_acc = val_acc
-            save_path = os.path.join("results", "best_model.pth")
+            # Save the model with a name corresponding to the experiment
+            save_path = os.path.join(results_dir, f"best_model_{config['MODEL_NAME']}.pth")
             torch.save(model.state_dict(), save_path)
             print(f"New best model saved to {save_path} with accuracy: {best_val_acc:.4f}")
-    print(f"\n--- Training Complete --- \nBest Validation Accuracy: {best_val_acc:.4f}")
 
-if __name__ == '__main__': main()
+    print(f"\n--- Training Complete for {config['MODEL_NAME']} ---")
+    print(f"Best Validation Accuracy: {best_val_acc:.4f}")
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Train a CNN model for brain tumor classification.")
+    parser.add_argument('--model_config', type=str, required=True, choices=['C1_CONFIG', 'C2_CONFIG'],
+                        help="The configuration key in config.yaml to use (e.g., 'C1_CONFIG').")
+    args = parser.parse_args()
+    main(args)
