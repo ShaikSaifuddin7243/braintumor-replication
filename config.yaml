@@ -1,15 +1,31 @@
-# FILE: config.yaml
-# Data settings
+# ==================================
+#         Global Settings
+# ==================================
 DATA_DIR: "data/clean"
 IMAGE_SIZE: 227
-NUM_CLASSES: 2 # (Tumor vs. No-Tumor)
-CLASSES: ['notumor', 'tumor']
-
-# Model settings
-MODEL_NAME: "CNN_C1"
-
-# Training settings
-BATCH_SIZE: 32
-EPOCHS: 50
-LEARNING_RATE: 0.0002
 DEVICE: "cuda" # "cuda" or "cpu"
+
+# ==================================
+#         C-1 Experiment
+# ==================================
+C1_CONFIG:
+  MODEL_NAME: "CNN_C1"
+  NUM_CLASSES: 2 
+  CLASSES: ['notumor', 'tumor'] # Labels are 0 and 1 respectively
+  BATCH_SIZE: 32
+  EPOCHS: 50 # We found convergence much earlier
+  LEARNING_RATE: 0.0002
+
+# ==================================
+#         C-2 Experiment
+# ==================================
+C2_CONFIG:
+  MODEL_NAME: "CNN_C2"
+  # NOTE: We are proceeding with the 4 classes we have. 'metastatic' is omitted for now.
+  NUM_CLASSES: 4
+  CLASSES: ['glioma', 'meningioma', 'notumor', 'pituitary'] # Labels 0, 1, 2, 3
+  BATCH_SIZE: 64 # As per paper spec (Table 6)
+  EPOCHS: 75 # A reasonable starting point
+  LEARNING_RATE: 0.0002 # As per paper spec (Table 6)
+  # Note: The paper mentions Momentum 0.95 and R2-regularization 0.002.
+  # We will add these directly to the optimizer in the training script.
